@@ -1,0 +1,5 @@
+numpy==1.21.2
+random
+pyTelegramBotAPI==4.3.1
+navec
+razdel
