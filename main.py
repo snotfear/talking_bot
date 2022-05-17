@@ -1,14 +1,10 @@
-import torch
+
 import numpy as np
-from random import random, randrange
+from random import randrange
 import telebot
-
-
-from sklearn.metrics.pairwise import cosine_similarity
 
 from numpy.linalg import norm
 from navec import Navec
-from slovnet.model.emb import NavecEmbedding
 from razdel import tokenize
 
 
@@ -28,8 +24,10 @@ with open('question-answer.txt', 'r', encoding='utf-8') as file:
     '''И разобъём строки по табуляции (ключи) и точке-с-запятой (значения)
     Ключами будут известные вопросы, значения - варианты ответов на них {'вопрос':[ответ_1, ответ_2...]}
     '''
+
     for line in temp_data:
         temp_list.append(line.split('\t'))
+
         for keys_and_value in temp_list:
             question_dict[keys_and_value[0]] = keys_and_value[1].split(';')
         temp_list = []
@@ -112,24 +110,44 @@ def random_for_answer(index_q):
     return random_int
 
 '''Преобразуем известные вопросы в список с векторными представлениям для более быстрого сравнения'''
-
 vectors_of_question = []
 question_list = generate_list_of_question(question_dict)
 for question in question_list:
     vectors_of_question.append(question_to_vec(question=question, embeddings=navec, tokenizer=tokenizer))
 
 
+dialog_history = []
+def control_history(dialog, message, answer):
+    if len(dialog) > 1:
+        dialog.pop(0)
+        dialog.pop(0)
+        dialog.append(message)
+        dialog.append(answer)
+    else:
+        dialog.append(message)
+        dialog.append(answer)
+
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    bot.send_message(message.chat.id, "Привет! Я бот, созданный для общения")
 
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn1 = telebot.types.KeyboardButton("Плохой ответ!")
+    markup.add(btn1)
+    bot.send_message(message.chat.id, "Привет! Я бот, созданный для общения", reply_markup=markup)
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    user_q = str(message.text.lower())
-    rank = rank_candidates(question=user_q, candidates_vec=vectors_of_question, embeddings=navec, tokenizer=tokenizer)
-    answer = question_dict[question_list[rank]][random_for_answer(rank)]
-    bot.send_message(message.chat.id, answer)
+    if (message.text == 'Плохой ответ!'):
+        bot.send_message(message.chat.id, text='К нашей следующей встрече я постараюсь найти правильный ответ!')
+        with open('bad_answer.txt', 'a', encoding='utf-8') as file:
+            file.write(f'{dialog_history[0]}\t{dialog_history[1]}\n')
+    else:
+        user_q = str(message.text.lower())
+        rank = rank_candidates(question=user_q, candidates_vec=vectors_of_question, embeddings=navec, tokenizer=tokenizer)
+        answer = question_dict[question_list[rank]][random_for_answer(rank)]
+        bot.send_message(message.chat.id, answer)
+        control_history(dialog_history, message.text, answer)
+
 
 
 bot.infinity_polling()
@@ -140,5 +158,5 @@ bot.infinity_polling()
 фильтр матерных слов через отдельный список
 + сравнение косинусного расстояния 
 Функцию добавления вопроса в словарь вопрос-ответ
-индекс подходящего вопроса - сам вопрос - вариант ответа
-рандомайзер для вариантов ответа'''
++ индекс подходящего вопроса - сам вопрос - вариант ответа
++ рандомайзер для вариантов ответа'''
